@@ -26,12 +26,16 @@ extern "C" {
 #define PAGE_PERIOD_CONFIG						(1)
 #define PAGE_SERVER_CONFIG						(2)
 
-#define STT_NO_WIFI								(0)
-#define STT_WIFI_BUT_NO_SERVER					(1)
-#define STT_WIFI_AND_SERVER						(2)
+#define STT_NO_WIFI								("Không thể kết nối wifi")
+#define STT_WIFI_BUT_NO_SERVER					("Đã kết nối wifi nhưng không thể kết nối server")
+#define STT_WIFI_AND_SERVER						("Kết nối wifi và server thành công")
+
+#define DEFAULT_SERVER							("api.thingspeak.com")
+#define DEFAULT_PORT							(80)
 
 const char HTTP_HEAD[] PROGMEM					= "<!DOCTYPE html><html lang=\"en\"><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1, user-scalable=no, charset=UTF-8\"/><title>{v}</title>";
-const char HTTP_HEAD_WITH_REFRESH[] PROGMEM		= "<!DOCTYPE html><html lang=\"en\"><head><meta http-equiv=\"refresh\"content=\"20;url=/status\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1, user-scalable=no, charset=UTF-8\"/><title>{v}</title>";
+const char HTTP_HEAD_WITH_REFRESH_20S[] PROGMEM	= "<!DOCTYPE html><html lang=\"en\"><head><meta http-equiv=\"refresh\"content=\"20;url=/status\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1, user-scalable=no, charset=UTF-8\"/><title>{v}</title>";
+const char HTTP_HEAD_WITH_REFRESH_2S[] PROGMEM	= "<!DOCTYPE html><html lang=\"en\"><head><meta http-equiv=\"refresh\"content=\"2;url=/status\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1, user-scalable=no, charset=UTF-8\"/><title>{v}</title>";
 const char HTTP_STYLE[] PROGMEM					= "<style>.c{text-align: center;} div,input{padding:5px;font-size:1em;} input{width:95%;} body{text-align: center;font-family:verdana;} button{border:0;border-radius:0.3rem;background-color:#1fa3ec;color:#fff;line-height:2.4rem;font-size:1.2rem;width:100%;} .q{float: right;width: 64px;text-align: right;} .l{background: url(\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAALVBMVEX///8EBwfBwsLw8PAzNjaCg4NTVVUjJiZDRUUUFxdiZGSho6OSk5Pg4eFydHTCjaf3AAAAZElEQVQ4je2NSw7AIAhEBamKn97/uMXEGBvozkWb9C2Zx4xzWykBhFAeYp9gkLyZE0zIMno9n4g19hmdY39scwqVkOXaxph0ZCXQcqxSpgQpONa59wkRDOL93eAXvimwlbPbwwVAegLS1HGfZAAAAABJRU5ErkJggg==\") no-repeat left center;background-size: 1em;}</style>";
 const char HTTP_SCRIPT[] PROGMEM				= "<script>function c(l){document.getElementById('s').value=l.innerText||l.textContent;document.getElementById('p').focus();}</script>";
 const char HTTP_HEAD_END[] PROGMEM				= "</head><body><div style='text-align:left;display:inline-block;min-width:260px;'>";
@@ -128,6 +132,9 @@ class WiFiManager
     void          setRemoveDuplicateAPs(boolean removeDuplicates);
 	int           connectWifi(String ssid, String pass);
 
+	bool		  setInfo();
+	bool		  getInfo();
+
 	
   private:
     std::unique_ptr<DNSServer>        dnsServer;
@@ -154,6 +161,7 @@ class WiFiManager
     unsigned long _configPortalStart      = 0;
 
 	int			  lastPage				  = -1;
+	String		  netStt				  = "";
 
     IPAddress     _ap_static_ip;
     IPAddress     _ap_static_gw;
@@ -185,7 +193,7 @@ class WiFiManager
 	void          handleInfo();
     void          handleReset();
     void          handleNotFound();
-	void		  handleStatus(int stt);
+	void		  handleStatus();
     void          handle204();
     boolean       captivePortal();
     boolean       configPortalHasTimeout();

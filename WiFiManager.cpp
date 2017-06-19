@@ -124,6 +124,7 @@ void WiFiManager::setupConfigPortal() {
   server->on("/csave", std::bind(&WiFiManager::handleConfigSave, this));
   server->on("/i", std::bind(&WiFiManager::handleInfo, this));
   server->on("/r", std::bind(&WiFiManager::handleReset, this));
+  server->on("/status", std::bind(&WiFiManager::handleStatus, this));
   
   //server->on("/generate_204", std::bind(&WiFiManager::handle204, this));  //Android/Chrome OS captive portal check.
   server->on("/fwlink", std::bind(&WiFiManager::handleRoot, this));  //Microsoft captive portal. Maybe not needed. Might be handled by notFound handler.
@@ -207,21 +208,48 @@ boolean  WiFiManager::startConfigPortal(char const *apName, char const *apPasswo
       // using user-provided  _ssid, _pass in place of system-stored ssid and pass
       if (connectWifi(_ssid, _pass) != WL_CONNECTED) {
         DEBUG_WM(F("Failed to connect."));
-		server->on("/status", std::bind(&WiFiManager::handleStatus, this, STT_NO_WIFI));
-      } else {
+		netStt = STT_NO_WIFI;
+		//server->on("/status", std::bind(&WiFiManager::handleStatus, this, STT_NO_WIFI));
+      } 
+	  else {
         //connected
-		  //if (server->connect(
-		server->on("/status", std::bind(&WiFiManager::handleStatus, this, STT_WIFI_AND_SERVER));
-        WiFi.mode(WIFI_STA);
+
+		char uServer[] = DEFAULT_SERVER;
+		WiFiClient wifiClient;
+		if (wifiClient.connect(uServer, port)) {
+			String cmd;
+			cmd += "GET https://";
+			cmd += uServer;
+			cmd += "/update?api_key=";
+			cmd += api;
+			cmd += "&field1=0";
+			wifiClient.println(cmd);
+			delay(500);
+			char buf[50];
+			int i = 0;
+			while (wifiClient.available()) {
+				buf[i++] = wifiClient.read();
+			}
+			if (atoi(buf) != 0) {
+				DEBUG_WM(F("GOOD"));
+				netStt = STT_WIFI_AND_SERVER;
+			}
+			else {
+				DEBUG_WM(F("NO SERVER"));
+				netStt = STT_WIFI_BUT_NO_SERVER;
+			}
+		}
+		
+        /*WiFi.mode(WIFI_STA);
         //notify that configuration has changed and any optional parameters should be saved
         if ( _savecallback != NULL) {
           //todo: check if any custom parameters actually exist, and check if they really changed maybe
           _savecallback();
         }
-        break;
+        break;*/
       }
 
-      if (_shouldBreakAfterConfig) {
+      /*if (_shouldBreakAfterConfig) {
         //flag set to exit after config after trying to connect
         //notify that configuration has changed and any optional parameters should be saved
         if ( _savecallback != NULL) {
@@ -229,11 +257,11 @@ boolean  WiFiManager::startConfigPortal(char const *apName, char const *apPasswo
           _savecallback();
         }
         break;
-      }
+      }*/
     }
     yield();
   }
-
+  
   server.reset();
   dnsServer.reset();
 
@@ -654,7 +682,7 @@ void WiFiManager::handleConfigSave() {
     optionalIPFromString(&_sta_static_sn, sn.c_str());
   }
 
-  String page = FPSTR(HTTP_HEAD_WITH_REFRESH);
+  String page = FPSTR(HTTP_HEAD_WITH_REFRESH_20S);
   page.replace("{v}", "Đang xác thực");
   page += FPSTR(HTTP_SCRIPT);
   page += FPSTR(HTTP_STYLE);
@@ -754,26 +782,18 @@ void WiFiManager::handleNotFound() {
   server->sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
   server->sendHeader("Pragma", "no-cache");
   server->sendHeader("Expires", "-1");
-  server->send ( 404, "text/plain", message );
+  server->send (404, "text/plain", message );
 }
 
-void WiFiManager::handleStatus(int stt) {
+void WiFiManager::handleStatus() {
   DEBUG_WM(F("Report"));
 
-  String page = FPSTR(HTTP_HEAD);
+  String page = FPSTR(HTTP_HEAD_WITH_REFRESH_2S);
   page.replace("{v}", "Đang xác thực");
   page += FPSTR(HTTP_SCRIPT);
   page += FPSTR(HTTP_STYLE);
   page += FPSTR(HTTP_HEAD_END);
-  if (stt == STT_NO_WIFI) {
-	  page += FPSTR(HTTP_STT_0);
-  }
-  else if (stt == STT_WIFI_BUT_NO_SERVER) {
-	  page += FPSTR(HTTP_STT_1);
-  }
-  else if (stt == STT_WIFI_AND_SERVER) {
-	  page += FPSTR(HTTP_STT_2);
-  }
+  page += netStt;
   page += FPSTR(HTTP_HOME_BUTTON);
   page += FPSTR(HTTP_END);
   server->send(200, "text/html", page);
